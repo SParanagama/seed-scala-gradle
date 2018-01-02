@@ -1,0 +1,68 @@
+apply plugin: 'java'
+apply plugin: 'scala'
+
+repositories {
+    maven { url "http://repo.maven.apache.org/maven2" }
+    maven { url "http://repo.hortonworks.com/content/groups/public/" }
+    maven { url "http://repo.hortonworks.com/content/repositories/releases" }
+    maven { url "https://plugins.gradle.org/m2/" }
+}
+
+
+group = 'com.sparanagama'
+version = '1.0.0-SNAPSHOT'
+
+apply plugin: 'distribution'
+
+configurations {
+    all*.exclude group: "org.jboss.netty", module: "netty"
+    compile.extendsFrom fat
+}
+
+def versions = [
+        scala: "2.11",
+        scala_lang: "2.11.2"
+]
+
+dependencies {
+    fat group: 'org.scala-lang', name: 'scala-library', version: versions.scala_lang
+}
+
+task fatjar(type: Jar) {
+
+    manifest {
+        attributes("Main-Class": "Main")
+    }
+    exclude 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/*.SF'
+
+    //baseName = project.name + '-fatjar'
+    classifier = "fatjar"
+
+    zip64 true
+    from {
+        (configurations.fat).collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+
+    with jar
+}
+
+// tar.gz distribution to deploy on Azkaban host
+distributions {
+    main {
+        contents {
+            baseName = rootProject.name
+            into( 'libs' ) {
+                from new File("$buildDir/libs/")
+            }
+        }
+    }
+}
+distTar {
+    compression = Compression.GZIP
+    extension = "tar.gz"
+}
+
+distTar.dependsOn([fatjar])
+
